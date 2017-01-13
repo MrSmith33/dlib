@@ -671,12 +671,13 @@ struct Vector(T, int size)
     */
     union
     {
+        import cbor;
         T[size] arrayof;
         static if (size < 5)
         {
-            struct { mixin(elements(["x", "y", "z", "w"])); }
-            struct { mixin(elements(["r", "g", "b", "a"])); }
-            struct { mixin(elements(["s", "t", "p", "q"])); }
+            @ignore struct { mixin(elements(["x", "y", "z", "w"])); }
+            @ignore struct { mixin(elements(["r", "g", "b", "a"])); }
+            @ignore struct { mixin(elements(["s", "t", "p", "q"])); }
         }
     }
 }

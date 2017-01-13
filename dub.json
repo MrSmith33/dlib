@@ -6,10 +6,13 @@
         "Andrey Penechko",
         "Vadim Lopatin",
         "Nick Papanastasiou",
-        "Oleg Baharev", 
-        "Roman Chistokhodov", 
+        "Oleg Baharev",
+        "Roman Chistokhodov",
         "Eugene Wissner"
     ],
+    "dependencies" : {
+        "cbor-d" : "==0.5.4"
+    },
     "license": "Boost",
     "homepage": "http://github.com/gecko0307/dlib",
     "name": "dlib",
