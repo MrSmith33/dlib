@@ -11,7 +11,7 @@
         "Eugene Wissner"
     ],
     "dependencies" : {
-        "cbor-d" : "==0.5.4"
+        "cbor-d" : ">=0.5.5"
     },
     "license": "Boost",
     "homepage": "http://github.com/gecko0307/dlib",
