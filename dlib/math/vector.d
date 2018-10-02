@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2011-2017 Timur Gafarov
+Copyright (c) 2011-2018 Timur Gafarov
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -133,6 +133,12 @@ struct Vector(T, int size)
             foreach(i; 0..v.arrayof.length)
                 arrayof[i] = cast(T)v.arrayof[i];
         }
+    }
+
+    // Same, but for enums
+    void opAssign(T2)(T2 ev) if (is(T2 == enum))
+    {
+        opAssign(cast(OriginalType!T2)ev);
     }
 
    /*
@@ -764,7 +770,7 @@ body
     return res;
 }
 
-alias tensorProduct outerProduct;
+alias outerProduct = tensorProduct;
 
 /*
  * Compute normal of a plane from three points
@@ -835,6 +841,22 @@ void rotateAroundAxis(T) (ref Vector!(T,3) V, Vector!(T,3) P, Vector!(T,3) D, T 
 /*
  * Compute distance between two points
  */
+T distance(T) (Vector!(T,2) a, Vector!(T,2) b)
+body
+{
+    T dx = a.x - b.x;
+    T dy = a.y - b.y;
+    return sqrt((dx * dx) + (dy * dy));
+}
+
+T distancesqr(T) (Vector!(T,2) a, Vector!(T,2) b)
+body
+{
+    T dx = a.x - b.x;
+    T dy = a.y - b.y;
+    return ((dx * dx) + (dy * dy));
+}
+
 T distance(T) (Vector!(T,3) a, Vector!(T,3) b)
 body
 {
@@ -870,7 +892,8 @@ Vector!(T,3) randomUnitVector3(T)()
 }
 
 /*
- * Interpolation
+ * Spherical linear interpolation
+ * (simple lerp is in dlib.math.interpolation)
  */
 Vector!(T,3) slerp(T) (Vector!(T,3) a, Vector!(T,3) b, T t)
 {
@@ -907,41 +930,60 @@ bool isAlmostZero(Vector3f v)
             isConsiderZero(v.z));
 }
 
+
+Vector!(T,3) reflect(T)(Vector!(T,3) I, Vector!(T,3) N)
+{
+    return I - N * dot(N, I) * 2.0;
+}
+
+Vector!(T,3) refract(T)(Vector!(T,3) I, Vector!(T,3) N, T r)
+{
+    T d = 1.0 - r * r * (1.0 - dot(N, I) * dot(N, I));
+    if (d < 0.0)
+        return Vector!(T,3)(0.0, 0.0, 0.0);
+    return I * r - N * (r * dot(N, I) + sqrt(d));
+}
+
+Vector!(T,3) faceforward(T)(Vector!(T,3) N, Vector!(T,3) I, Vector!(T,3) Nref) 
+{
+    return dot(Nref, I) < 0.0 ? N : -N;
+}
+
 /*
  * Predefined vector types
  */
-alias Vector!(int, 2) Vector2i;
-alias Vector!(uint, 2) Vector2u;
-alias Vector!(float, 2) Vector2f;
-alias Vector!(double, 2) Vector2d;
+alias Vector2i = Vector!(int, 2);
+alias Vector2u = Vector!(uint, 2);
+alias Vector2f = Vector!(float, 2);
+alias Vector2d = Vector!(double, 2);
 
-alias Vector!(int, 3) Vector3i;
-alias Vector!(uint, 3) Vector3u;
-alias Vector!(float, 3) Vector3f;
-alias Vector!(double, 3) Vector3d;
+alias Vector3i = Vector!(int, 3);
+alias Vector3u = Vector!(uint, 3);
+alias Vector3f = Vector!(float, 3);
+alias Vector3d = Vector!(double, 3);
 
-alias Vector!(int, 4) Vector4i;
-alias Vector!(uint, 4) Vector4u;
-alias Vector!(float, 4) Vector4f;
-alias Vector!(double, 4) Vector4d;
+alias Vector4i = Vector!(int, 4);
+alias Vector4u = Vector!(uint, 4);
+alias Vector4f = Vector!(float, 4);
+alias Vector4d = Vector!(double, 4);
 
 /*
- * Short aliases
+ * GLSL-like short aliases
  */
-alias Vector2i ivec2;
-alias Vector2u uvec2;
-alias Vector2f vec2;
-alias Vector2d dvec2;
+alias ivec2 = Vector2i;
+alias uvec2 = Vector2u;
+alias vec2 = Vector2f;
+alias dvec2 = Vector2d;
 
-alias Vector3i ivec3;
-alias Vector3u uvec3;
-alias Vector3f vec3;
-alias Vector3d dvec3;
+alias ivec3 = Vector3i;
+alias uvec3 = Vector3u;
+alias vec3 = Vector3f;
+alias dvec3 = Vector3d;
 
-alias Vector4i ivec4;
-alias Vector4u uvec4;
-alias Vector4f vec4;
-alias Vector4d dvec4;
+alias ivec4 = Vector4i;
+alias uvec4 = Vector4u;
+alias vec4 = Vector4f;
+alias dvec4 = Vector4d;
 
 /*
  * Axis vectors
@@ -952,16 +994,6 @@ static struct AxisVector
     Vector3f y = Vector3f(0.0f, 1.0f, 0.0f);
     Vector3f z = Vector3f(0.0f, 0.0f, 1.0f);
 }
-
-// For some reason, this doesn't work:
-/*
-enum AxisVector: Vector3f
-{
-    x = Vector3f(1.0f, 0.0f, 0.0f),
-    y = Vector3f(0.0f, 1.0f, 0.0f),
-    z = Vector3f(0.0f, 0.0f, 1.0f)
-}
-*/
 
 /*
  * Vector factory function

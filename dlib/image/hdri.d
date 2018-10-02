@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2017 Timur Gafarov
+Copyright (c) 2014-2018 Timur Gafarov
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -31,16 +31,27 @@ module dlib.image.hdri;
 private
 {
     import core.stdc.string;
+    import std.math;
     import dlib.core.memory;
     import dlib.image.image;
     import dlib.image.color;
+    import dlib.math.vector;
+    import dlib.math.utils;
+}
+
+enum FloatPixelFormat: uint
+{
+    RGBAF32 = 8
+    //TODO:
+    //RGBAF64 = 9
+    //RGBAF16 = 10
 }
 
 abstract class SuperHDRImage: SuperImage
 {
-    override @property PixelFormat pixelFormat()
+    override @property uint pixelFormat()
     {
-        return PixelFormat.RGBA_FLOAT;
+        return FloatPixelFormat.RGBAF32;
     }
 }
 
@@ -48,44 +59,44 @@ class HDRImage: SuperHDRImage
 {
     public:
 
-    override @property uint width()
+    @property uint width()
     {
         return _width;
     }
 
-    override @property uint height()
+    @property uint height()
     {
         return _height;
     }
 
-    override @property uint bitDepth()
+    @property uint bitDepth()
     {
         return _bitDepth;
     }
 
-    override @property uint channels()
+    @property uint channels()
     {
         return _channels;
     }
 
-    override @property uint pixelSize()
+    @property uint pixelSize()
     {
         return _pixelSize;
     }
 
-    override @property ref ubyte[] data()
+    @property ubyte[] data()
     {
         return _data;
     }
 
-    override @property SuperImage dup()
+    @property SuperImage dup()
     {
         auto res = new HDRImage(_width, _height);
-        res.data = _data.dup;
+        res.data[] = data[];
         return res;
     }
 
-    override SuperImage createSameFormat(uint w, uint h)
+    SuperImage createSameFormat(uint w, uint h)
     {
         return new HDRImage(w, h);
     }
@@ -98,12 +109,9 @@ class HDRImage: SuperHDRImage
         _channels = 4;
         _pixelSize = (_bitDepth / 8) * _channels;
         allocateData();
-
-        pixelCost = 1.0f / (_width * _height);
-        progress = 0.0f;
     }
 
-    override Color4f opIndex(int x, int y)
+    Color4f opIndex(int x, int y)
     {
         while(x >= _width) x = _width-1;
         while(y >= _height) y = _height-1;
@@ -119,7 +127,7 @@ class HDRImage: SuperHDRImage
         return Color4f(r, g, b, a);
     }
 
-    override Color4f opIndexAssign(Color4f c, int x, int y)
+    Color4f opIndexAssign(Color4f c, int x, int y)
     {
         while(x >= _width) x = _width-1;
         while(y >= _height) y = _height-1;
@@ -242,7 +250,7 @@ SuperImage hdrTonemapGamma(SuperHDRImage img, SuperImage output, float gamma)
     if (output)
         res = output;
     else
-        res = image(img.width, img.height, 3);
+        res = image(img.width, img.height, img.channels);
 
     foreach(y; 0..img.height)
     foreach(x; 0..img.width)
@@ -256,3 +264,152 @@ SuperImage hdrTonemapGamma(SuperHDRImage img, SuperImage output, float gamma)
 
     return res;
 }
+
+SuperImage hdrTonemapReinhard(SuperHDRImage img, float exposure, float gamma)
+{
+    return hdrTonemapReinhard(img, null, exposure, gamma);
+}
+
+SuperImage hdrTonemapReinhard(SuperHDRImage img, SuperImage output, float exposure, float gamma)
+{
+    SuperImage res;
+    if (output)
+        res = output;
+    else
+        res = image(img.width, img.height, img.channels);
+
+    foreach(y; 0..img.height)
+    foreach(x; 0..img.width)
+    {
+        Color4f c = img[x, y];
+        Vector3f v = c * exposure;
+        v = v / (v + 1.0f);
+        float r = v.r ^^ gamma;
+        float g = v.g ^^ gamma;
+        float b = v.b ^^ gamma;
+        res[x, y] = Color4f(r, g, b, c.a);
+    }
+
+    return res;
+}
+
+SuperImage hdrTonemapHable(SuperHDRImage img, float exposure, float gamma)
+{
+    return hdrTonemapHable(img, null, exposure, gamma);
+}
+
+SuperImage hdrTonemapHable(SuperHDRImage img, SuperImage output, float exposure, float gamma)
+{
+    SuperImage res;
+    if (output)
+        res = output;
+    else
+        res = image(img.width, img.height, img.channels);
+
+    foreach(y; 0..img.height)
+    foreach(x; 0..img.width)
+    {
+        Color4f c = img[x, y];
+        Vector3f v = c * exposure;
+        Vector3f one = Vector3f(1.0f, 1.0f, 1.0f);
+        Vector3f W = Vector3f(11.2f, 11.2f, 11.2f);
+        v = hableFunc(v * 2.0f) * (one / hableFunc(W));
+        float r = v.r ^^ gamma;
+        float g = v.g ^^ gamma;
+        float b = v.b ^^ gamma;
+        res[x, y] = Color4f(r, g, b, c.a);
+    }
+
+    return res;
+}
+
+Vector3f hableFunc(Vector3f x)
+{
+   return ((x * (x * 0.15f + 0.1f * 0.5f) + 0.2f * 0.02f) / (x * (x * 0.15f + 0.5f) + 0.2f * 0.3f)) - 0.02f / 0.3f;
+}
+
+SuperImage hdrTonemapACES(SuperHDRImage img, float exposure, float gamma)
+{
+    return hdrTonemapACES(img, null, exposure, gamma);
+}
+
+SuperImage hdrTonemapACES(SuperHDRImage img, SuperImage output, float exposure, float gamma)
+{
+    SuperImage res;
+    if (output)
+        res = output;
+    else
+        res = image(img.width, img.height, img.channels);
+
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+
+    foreach(y; 0..img.height)
+    foreach(x; 0..img.width)
+    {
+        Color4f col = img[x, y];
+        Color4f v = col * exposure * 0.6;
+        v = ((v*(v*a+b))/(v*(v*c+d)+e)).clamped(0.0, 1.0);
+        res[x, y] = Color4f(
+            v.r ^^ gamma, 
+            v.g ^^ gamma, 
+            v.b ^^ gamma, 
+            col.a);
+    }
+
+    return res;
+}
+
+SuperImage hdrTonemapAverageLuminance(SuperHDRImage img, float a, float gamma)
+{
+    return hdrTonemapAverageLuminance(img, null, a, gamma);
+}
+
+SuperImage hdrTonemapAverageLuminance(SuperHDRImage img, SuperImage output, float a, float gamma)
+{
+    SuperImage res;
+    if (output)
+        res = output;
+    else
+        res = image(img.width, img.height, img.channels);
+
+    float lumAverage = averageLuminance(img);
+    float aOverLumAverage = a / lumAverage;
+
+    foreach(y; 0..img.height)
+    foreach(x; 0..img.width)
+    {
+        auto col = img[x, y];
+        float Lw = col.luminance;
+        float L = Lw * aOverLumAverage;
+        float Ld = L / (1.0f + L);
+        Color4f nRGB = col / Lw;
+        Color4f dRGB = nRGB * Ld;
+        float r = dRGB.r ^^ gamma;
+        float g = dRGB.g ^^ gamma;
+        float b = dRGB.b ^^ gamma;
+        res[x, y] = Color4f(r, g, b, col.a);
+    }
+
+    return res;
+}
+
+float averageLuminance(SuperHDRImage img)
+{
+    float sumLuminance = 0.0f;
+
+    foreach(y; 0..img.height)
+    foreach(x; 0..img.width)
+    {
+        sumLuminance += log(EPSILON + img[x, y].luminance);        
+    }
+
+    float N = img.width * img.height;
+    float lumAverage = exp(sumLuminance / N); 
+    return lumAverage;
+}
+
+

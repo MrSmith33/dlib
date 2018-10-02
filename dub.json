@@ -8,12 +8,15 @@
         "Nick Papanastasiou",
         "Oleg Baharev",
         "Roman Chistokhodov",
-        "Eugene Wissner"
+        "Eugene Wissner",
+        "Roman Vlasov",
+        "Basile Burg",
+        "Valeriy Fedotov"
     ],
     "dependencies" : {
         "cbor-d" : ">=0.5.5"
     },
-    "license": "Boost",
+    "license": "BSL-1.0",
     "homepage": "http://github.com/gecko0307/dlib",
     "name": "dlib",
     "importPaths": [
@@ -22,6 +25,7 @@
     "buildRequirements":[
         "allowWarnings"
     ],
+    "lflags-linux-gdc": ["-lz"],
     "configurations": [
         {
             "name": "library",

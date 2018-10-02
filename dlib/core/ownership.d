@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2016-2017 Eugene Wissner
+Copyright (c) 2017 Timur Gafarov
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -26,30 +26,40 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 */
 
-/**
-* Copyright: Eugene Wissner 2016-2017.
-* License: $(LINK2 boost.org/LICENSE_1_0.txt, Boost License 1.0).
-* Authors: Eugene Wissner
-*/
-module dlib.async.iocp;
+module dlib.core.ownership;
 
-version (Windows):
+import dlib.core.memory;
+import dlib.container.array;
 
-import core.sys.windows.winbase;
-import core.sys.windows.windef;
-
-/**
- * Provides an extendable representation of a Win32 $(D_PSYMBOL OVERLAPPED)
- * structure.
- */
-class State
+interface Owned
 {
-    /// For internal use by Windows API.
-    align(1) OVERLAPPED overlapped;
-
-    /// File/socket handle.
-    HANDLE handle;
-
-    /// For keeping events or event masks.
-    int event;
 }
+
+class Owner: Owned
+{
+    DynamicArray!Owned ownedObjects;
+
+    this(Owner owner)
+    {
+        if (owner)
+            owner.addOwnedObject(this);
+    }
+
+    void addOwnedObject(Owned obj)
+    {
+        ownedObjects.append(obj);
+    }
+
+    void clearOwnedObjects()
+    {
+        foreach(i, obj; ownedObjects)
+            Delete(obj);
+        ownedObjects.free();
+    }
+
+    ~this()
+    {
+        clearOwnedObjects();
+    }
+}
+

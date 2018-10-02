@@ -51,23 +51,23 @@ class Mallocator : Allocator
      *
      * Returns: The pointer to the new allocated memory.
      */
-    void[] allocate(size_t size) shared @nogc nothrow
+    void[] allocate(size_t size)
     {
         if (!size)
         {
             return null;
         }
-        auto p = malloc(size + psize);
+        auto p = malloc(size);
 
         if (!p)
         {
             onOutOfMemoryError();
         }
-        return p[psize.. psize + size];
+        return p[0..size];
     }
 
     ///
-    @nogc nothrow unittest
+    unittest
     {
         auto p = Mallocator.instance.allocate(20);
 
@@ -84,17 +84,17 @@ class Mallocator : Allocator
      *
      * Returns: Whether the deallocation was successful.
      */
-    bool deallocate(void[] p) shared @nogc nothrow
+    bool deallocate(void[] p)
     {
         if (p !is null)
         {
-            free(p.ptr - psize);
+            free(p.ptr);
         }
         return true;
     }
 
     ///
-    @nogc nothrow unittest
+    unittest
     {
         void[] p;
         assert(Mallocator.instance.deallocate(p));
@@ -112,7 +112,7 @@ class Mallocator : Allocator
      *
      * Returns: Whether the reallocation was successful.
      */
-    bool reallocate(ref void[] p, size_t size) shared @nogc nothrow
+    bool reallocate(ref void[] p, size_t size)
     {
         if (!size)
         {
@@ -125,19 +125,19 @@ class Mallocator : Allocator
             p = allocate(size);
             return true;
         }
-        auto r = realloc(p.ptr - psize, size + psize);
+        auto r = realloc(p.ptr, size);
 
         if (!r)
         {
             onOutOfMemoryError();
         }
-        p = r[psize.. psize + size];
+        p = r[0..size];
 
         return true;
     }
 
     ///
-    @nogc nothrow unittest
+    unittest
     {
         void[] p;
 
@@ -157,7 +157,7 @@ class Mallocator : Allocator
     /**
      * Returns: The alignment offered.
      */
-    @property immutable(uint) alignment() shared const @safe pure nothrow
+    @property immutable(uint) alignment() const
     {
         return cast(uint) max(double.alignof, real.alignof);
     }
@@ -167,19 +167,19 @@ class Mallocator : Allocator
      *
      * Returns: The global $(D_PSYMBOL Allocator) instance.
      */
-    static @property ref shared(Mallocator) instance() @nogc nothrow
+    static @property Mallocator instance() @nogc nothrow
     {
         if (instance_ is null)
         {
-            immutable size = __traits(classInstanceSize, Mallocator) + psize;
+            immutable size = __traits(classInstanceSize, Mallocator);
             void* p = malloc(size);
 
             if (p is null)
             {
                 onOutOfMemoryError();
             }
-            p[psize..size] = typeid(Mallocator).initializer[];
-            instance_ = cast(shared Mallocator) p[psize..size].ptr;
+            p[0..size] = typeid(Mallocator).initializer[];
+            instance_ = cast(Mallocator) p[0..size].ptr;
         }
         return instance_;
     }
@@ -190,7 +190,6 @@ class Mallocator : Allocator
         assert(instance is instance);
     }
 
-    private enum psize = 8;
-
-    private shared static Mallocator instance_;
+    private static __gshared Mallocator instance_;
 }
+

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2016-2017 Eugene Wissner
+Copyright (c) 2011-2017 Timur Gafarov
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -26,30 +26,63 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 */
 
-/**
- * Copyright: Eugene Wissner 2016-2017.
- * License: $(LINK2 boost.org/LICENSE_1_0.txt, Boost License 1.0).
- * Authors: Eugene Wissner
- */
-module dlib.memory;
+module dlib.image.filters.contrast;
 
-public
+private
 {
-    import dlib.memory.allocator;
-    import dlib.memory.gcallocator;
-    import dlib.memory.mallocator;
-    import dlib.memory.mmappool;
-
-    import std.experimental.allocator : make, dispose, shrinkArray, expandArray, makeArray, dispose;
+    import dlib.image.image;
+    import dlib.image.color;
 }
 
-Allocator allocator;
-
-@property Allocator defaultAllocator()
+enum ContrastMethod
 {
-    if (allocator is null)
+    AverageGray,
+    AverageImage,
+}
+
+SuperImage contrast(SuperImage a, float k, ContrastMethod method = ContrastMethod.AverageGray)
+{
+    return contrast(a, null, k, method);
+}
+
+SuperImage contrast(SuperImage img, SuperImage outp, float k, ContrastMethod method = ContrastMethod.AverageGray)
+{
+    SuperImage res;
+    if (outp)
+        res = outp;
+    else
+        res = img.dup;
+
+    Color4f aver = Color4f(0.0f, 0.0f, 0.0f);
+
+    if (method == ContrastMethod.AverageGray)
     {
-        allocator = Mallocator.instance;
+        aver = Color4f(0.5f, 0.5f, 0.5f);
     }
-    return allocator;
+    else if (method == ContrastMethod.AverageImage)
+    {
+        foreach(y; 0..res.height)
+        foreach(x; 0..res.width)
+        {
+            aver += img[x, y];
+            //img.updateProgress();
+        }
+
+        aver /= (res.height * res.width);
+
+        //img.resetProgress();
+    }
+
+    foreach(y; 0..res.height)
+    foreach(x; 0..res.width)
+    {
+        auto col = img[x, y];
+        col = ((col - aver) * k + aver);
+        res[x, y] = col;
+        //img.updateProgress();
+    }
+
+    //img.resetProgress();
+
+    return res;
 }

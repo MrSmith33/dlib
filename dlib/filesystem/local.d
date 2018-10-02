@@ -124,14 +124,28 @@ class LocalFileSystem : FileSystem {
 
             stat_out.sizeInBytes = st.st_size;
             stat_out.creationTimestamp = SysTime(unixTimeToStdTime(st.st_ctime));
-            stat_out.modificationTimestamp = SysTime(unixTimeToStdTime(st.st_mtime));
+            auto modificationStdTime = unixTimeToStdTime(st.st_mtime);
+            static if (is(typeof(st.st_mtimensec)))
+            {
+                modificationStdTime += st.st_mtimensec / 100;
+            }
+            stat_out.modificationTimestamp = SysTime(modificationStdTime);
+
+            if ((st.st_mode & S_IRUSR) | (st.st_mode & S_IRGRP) | (st.st_mode & S_IROTH))
+                stat_out.permissions |= PRead;
+            if ((st.st_mode & S_IWUSR) | (st.st_mode & S_IWGRP) | (st.st_mode & S_IWOTH))
+                stat_out.permissions |= PWrite;
+            if ((st.st_mode & S_IXUSR) | (st.st_mode & S_IXGRP) | (st.st_mode & S_IXOTH))
+                stat_out.permissions |= PExecute;
 
             return true;
         }
         else version (Windows) {
             WIN32_FILE_ATTRIBUTE_DATA data;
+            
+            auto p = toUTF16z(path);
 
-            if (!GetFileAttributesExW(toUTF16z(path), GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, &data))
+            if (!GetFileAttributesExW(p, GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, &data))
                 return false;
 
             if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
@@ -142,6 +156,30 @@ class LocalFileSystem : FileSystem {
             stat_out.sizeInBytes = (cast(FileSize) data.nFileSizeHigh << 32) | data.nFileSizeLow;
             stat_out.creationTimestamp = SysTime(FILETIMEToStdTime(&data.ftCreationTime));
             stat_out.modificationTimestamp = SysTime(FILETIMEToStdTime(&data.ftLastWriteTime));
+            
+            stat_out.permissions = 0;
+            
+            PACL pacl;
+            PSECURITY_DESCRIPTOR secDesc;
+            TRUSTEE_W trustee;
+            trustee.pMultipleTrustee = null;
+            trustee.MultipleTrusteeOperation = MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE;
+            trustee.TrusteeForm = TRUSTEE_FORM.TRUSTEE_IS_NAME;
+            trustee.TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN;
+            trustee.ptstrName = cast(wchar*)"CURRENT_USER"w.ptr;
+            GetNamedSecurityInfoW(cast(wchar*)p, SE_OBJECT_TYPE.SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, null, null, &pacl, null, &secDesc);
+            if (pacl)
+            {
+                uint access;
+                GetEffectiveRightsFromAcl(pacl, &trustee, &access);
+                
+                if (access & ACTRL_FILE_READ)
+                    stat_out.permissions |= PRead;
+                if ((access & ACTRL_FILE_WRITE) && !(data.dwFileAttributes & FILE_ATTRIBUTE_READONLY))
+                    stat_out.permissions |= PWrite;
+                if (access & ACTRL_FILE_EXECUTE)
+                    stat_out.permissions |= PExecute;
+            }
 
             return true;
         }

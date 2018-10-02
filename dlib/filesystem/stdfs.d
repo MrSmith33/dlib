@@ -31,26 +31,29 @@ module dlib.filesystem.stdfs;
 import core.stdc.stdio;
 import std.file;
 import std.string;
+import std.datetime;
 import dlib.core.memory;
 import dlib.core.stream;
 import dlib.container.dict;
+import dlib.container.array;
 import dlib.filesystem.filesystem;
 
 version(Posix)
 {
-    import core.sys.posix.sys.stat;
+    import dlib.filesystem.posix.common;
     import dlib.filesystem.stdposixdir;
 }
 version(Windows)
 {
     import std.stdio;
+    import dlib.filesystem.windows.common;
     import dlib.filesystem.stdwindowsdir;
 }
 
 import dlib.text.utils;
 import dlib.text.utf16;
 
-// TODO: where is these definitions in druntime?
+// TODO: where are these definitions in druntime?
 version(Windows)
 {
    extern(C) int _wmkdir(const wchar*);
@@ -266,6 +269,7 @@ class StdIOStream: IOStream
 class StdFileSystem: FileSystem
 {
     Dict!(Directory, string) openedDirs;
+    DynamicArray!string openedDirPaths;
 
     this()
     {
@@ -277,6 +281,10 @@ class StdFileSystem: FileSystem
         foreach(k, v; openedDirs)
             Delete(v);
         Delete(openedDirs);
+
+        foreach(p; openedDirPaths)
+            Delete(p);
+        openedDirPaths.free();
     }
 
     bool stat(string filename, out FileStat stat)
@@ -285,12 +293,82 @@ class StdFileSystem: FileSystem
         {
             with(stat)
             {
-                isFile = std.file.isFile(filename);
-                isDirectory = std.file.isDir(filename);
-                sizeInBytes = std.file.getSize(filename);
-                getTimes(filename,
-                    modificationTimestamp,
-                    modificationTimestamp);
+                version (Posix)
+                {
+                    stat_t st;
+                    stat_(toStringz(filename), &st); // TODO: GC-free toStringz replacement
+
+                    isFile = S_ISREG(st.st_mode);
+                    isDirectory = S_ISDIR(st.st_mode);
+                    sizeInBytes = st.st_size;
+                    creationTimestamp = SysTime(unixTimeToStdTime(st.st_ctime));
+                    auto modificationStdTime = unixTimeToStdTime(st.st_mtime);
+                    static if (is(typeof(st.st_mtimensec)))
+                    {
+                        modificationStdTime += st.st_mtimensec / 100;
+                    }
+                    modificationTimestamp = SysTime(modificationStdTime);
+
+                    if ((st.st_mode & S_IRUSR) | (st.st_mode & S_IRGRP) | (st.st_mode & S_IROTH))
+                        permissions |= PRead;
+                    if ((st.st_mode & S_IWUSR) | (st.st_mode & S_IWGRP) | (st.st_mode & S_IWOTH))
+                        permissions |= PWrite;
+                    if ((st.st_mode & S_IXUSR) | (st.st_mode & S_IXGRP) | (st.st_mode & S_IXOTH))
+                        permissions |= PExecute;
+                }
+                else version(Windows)
+                {
+                    wchar[] filename_utf16 = convertUTF8toUTF16(filename, true);
+
+                    WIN32_FILE_ATTRIBUTE_DATA data;
+
+                    if (!GetFileAttributesExW(filename_utf16.ptr, GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, &data))
+                        return false;
+
+                    if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                        isDirectory = true;
+                    else
+                        isFile = true;
+
+                    sizeInBytes = (cast(FileSize) data.nFileSizeHigh << 32) | data.nFileSizeLow;
+                    creationTimestamp = SysTime(FILETIMEToStdTime(&data.ftCreationTime));
+                    modificationTimestamp = SysTime(FILETIMEToStdTime(&data.ftLastWriteTime));
+                    
+                    permissions = 0;
+                    
+                    PACL pacl;
+                    PSECURITY_DESCRIPTOR secDesc;
+                    TRUSTEE_W trustee;
+                    trustee.pMultipleTrustee = null;
+                    trustee.MultipleTrusteeOperation = MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE;
+                    trustee.TrusteeForm = TRUSTEE_FORM.TRUSTEE_IS_NAME;
+                    trustee.TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN;
+                    trustee.ptstrName = cast(wchar*)"CURRENT_USER"w.ptr;
+                    GetNamedSecurityInfoW(filename_utf16.ptr, SE_OBJECT_TYPE.SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, null, null, &pacl, null, &secDesc);
+                    if (pacl)
+                    {
+                        uint access;
+                        GetEffectiveRightsFromAcl(pacl, &trustee, &access);
+                        
+                        if (access & ACTRL_FILE_READ)
+                            permissions |= PRead;
+                        if ((access & ACTRL_FILE_WRITE) && !(data.dwFileAttributes & FILE_ATTRIBUTE_READONLY))
+                            permissions |= PWrite;
+                        if (access & ACTRL_FILE_EXECUTE)
+                            permissions |= PExecute;
+                    }
+
+                    Delete(filename_utf16);
+                }
+                else
+                {
+                    isFile = std.file.isFile(filename);
+                    isDirectory = std.file.isDir(filename);
+                    sizeInBytes = std.file.getSize(filename);
+                    getTimes(filename,
+                        modificationTimestamp,
+                        modificationTimestamp);
+                }
             }
             return true;
         }
@@ -351,37 +429,31 @@ class StdFileSystem: FileSystem
 
     Directory openDir(string path)
     {
+        if (path in openedDirs)
+        {
+            Directory d = openedDirs[path];
+            Delete(d);
+        }
+
+        Directory dir;
+
         version(Posix)
         {
-            if (path in openedDirs)
-            {
-                auto d = openedDirs[path];
-                //d.reset();
-                return d;
-            }
-            else
-            {
-                auto dir = New!StdPosixDirectory(path);
-                openedDirs[path] = dir;
-                return dir;
-            }
+            dir = New!StdPosixDirectory(path);
         }
         version(Windows)
         {
-            if (path in openedDirs)
-            {
-                return openedDirs[path];
-            }
-            else
-            {
-                string s = catStr(path, "\\*.*");
-                wchar[] ws = convertUTF8toUTF16(s, true);
-                Delete(s);
-                auto dir = New!StdWindowsDirectory(ws.ptr);
-                openedDirs[path] = dir;
-                return dir;
-            }
+            string s = catStr(path, "\\*.*");
+            wchar[] ws = convertUTF8toUTF16(s, true);
+            Delete(s);
+            dir = New!StdWindowsDirectory(ws.ptr);
         }
+
+        auto p = New!(char[])(path.length);
+        p[] = path[];
+        openedDirPaths.append(cast(string)p);
+        openedDirs[cast(string)p] = dir;
+        return dir;
     }
 
     bool createDir(string path, bool recursive = true)
@@ -453,3 +525,119 @@ T readStruct(T)(InputStream istrm) if (is(T == struct))
     istrm.readBytes(res.ptr, T.sizeof);
     return res;
 }
+enum MAX_PATH_LEN = 4096;
+
+struct PathBuilder
+{
+    char[MAX_PATH_LEN] str;
+    uint length = 0;
+
+    void append(string s)
+    {
+        if (length && str[length-1] != '/')
+        {
+            str[length] = '/';
+            length++;
+        }
+
+        str[length..length+s.length] = s[];
+        length += s.length;
+    }
+
+    string toString()
+    {
+        if (length)
+            return cast(string)(str[0..length]);
+        else
+            return "";
+    }
+}
+
+struct RecursiveFileIterator
+{
+    PathBuilder pb;
+    ReadOnlyFileSystem rofs;
+    string directory;
+    bool rec;
+
+    this(ReadOnlyFileSystem fs, string dir, bool recursive)
+    {
+        rofs = fs;
+        directory = dir;
+        pb.append(dir);
+        rec = recursive;
+    }
+
+    int opApply(scope int delegate(string path, ref dlib.filesystem.filesystem.DirEntry) dg)
+    {
+        int result = 0;
+
+        if (!rofs)
+            return 0;
+
+        foreach(e; rofs.openDir(directory).contents)
+        {
+            uint pathPos = pb.length;
+            pb.append(e.name);
+
+            string oldPath = directory;
+            directory = pb.toString;
+
+            result = dg(directory, e);
+            if (result)
+                break;
+
+            if (e.isDirectory && rec)
+                result = opApply(dg);
+
+            directory = oldPath;
+            pb.length = pathPos;
+
+            if (result)
+                break;
+        }
+
+        return 0;
+    }
+
+    int opApply(scope int delegate(ref dlib.filesystem.filesystem.DirEntry) dg)
+    {
+        int result = 0;
+
+        auto dir = rofs.openDir(directory);
+
+        foreach(e; dir.contents)
+        {
+            uint pathPos = pb.length;
+            pb.append(e.name);
+
+            string oldPath = directory;
+            directory = pb.toString;
+
+            result = dg(e);
+            if (result)
+                break;
+
+            if (e.isDirectory)
+                result = opApply(dg);
+
+            directory = oldPath;
+            pb.length = pathPos;
+
+            if (result)
+                break;
+        }
+
+        return 0;
+    }
+}
+
+RecursiveFileIterator traverseDir(ReadOnlyFileSystem rofs, string baseDir, bool recursive)
+{
+    FileStat s;
+    if (!rofs.stat(baseDir, s))  
+        return RecursiveFileIterator(null, baseDir, recursive);
+    else
+        return RecursiveFileIterator(rofs, baseDir, recursive);
+}
+

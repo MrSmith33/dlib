@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2011-2017 Timur Gafarov
+Copyright (c) 2011-2018 Timur Gafarov
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -64,7 +64,20 @@ T radtodeg(T) (T angle) nothrow
 }
 
 /*
- * Find maximum of three values
+ * Find maximum and minimum of two values
+ */
+T max2(T) (T x, T y) nothrow
+{
+    return (x > y)? x : y;
+}
+
+T min2(T) (T x, T y) nothrow
+{
+    return (x < y)? x : y;
+}
+
+/*
+ * Find maximum and minimum of three values
  */
 T max3(T) (T x, T y, T z) nothrow
 {
@@ -103,7 +116,6 @@ else
  */
 bool isConsiderZero(T) (T f) nothrow
 {
-    //enum ZERO = 1.0e-6;
     return (abs(f) < EPSILON);
 }
 
@@ -168,7 +180,17 @@ bool oneOfIsZero(T) (T[] array...) nothrow
  */
 version (BigEndian)
 {
+    ushort bigEndian(ushort value) nothrow
+    {
+        return value;
+    }
+
     uint bigEndian(uint value) nothrow
+    {
+        return value;
+    }
+
+    ushort networkByteOrder(ushort value) nothrow
     {
         return value;
     }
@@ -181,12 +203,22 @@ version (BigEndian)
 
 version (LittleEndian)
 {
+    ushort bigEndian(ushort value) nothrow
+    {
+        return ((value & 0xFF) << 8) | ((value >> 8) & 0xFF);
+    }
+
     uint bigEndian(uint value) nothrow
     {
         return value << 24
             | (value & 0x0000FF00) << 8
             | (value & 0x00FF0000) >> 8
             |  value >> 24;
+    }
+
+    ushort networkByteOrder(ushort value) nothrow
+    {
+        return bigEndian(value);
     }
 
     uint networkByteOrder(uint value) nothrow

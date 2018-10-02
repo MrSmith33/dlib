@@ -42,8 +42,8 @@ enum Channel
     A = 3
 }
 
-alias Vector!(ushort, 4) Color4;
-alias Color4 ColorRGBA;
+alias Color4 = Vector!(ushort, 4);
+alias ColorRGBA = Color4;
 
 Color4 invert(Color4 c)
 {
@@ -93,13 +93,6 @@ struct Color4f
         return Color4f(0.0f, 0.0f, 0.0f, 0.0f);
     }
 
-/*
-    Color4f opAssign(Vector4f v)
-    {
-        vec = v;
-        return this;
-    }
-*/
     Color4f opAssign(Color4f c)
     {
         vec = c.vec;
@@ -162,7 +155,7 @@ struct Color4f
         return cast(int)((luminance() - c.luminance()) * 100);
     }
 
-    alias luminance709 luminance;
+    alias luminance = luminance709;
 
     // ITU-R Rec. BT.709
     float luminance709() const
@@ -202,6 +195,25 @@ struct Color4f
             vec.a.clamp(minv, maxv)
         );
     }
+
+    // Converts color to linear space
+    Color4f toLinear(float gamma = 2.2f)
+    {
+        float lr = r ^^ gamma;
+        float lg = g ^^ gamma;
+        float lb = b ^^ gamma;
+        return Color4f(lr, lg, lb, a);
+    }
+
+    // Converts color to gamma space
+    Color4f toGamma(float gamma = 2.2f)
+    {
+        float invGamma = 1.0f / gamma;
+        float lr = r ^^ invGamma;
+        float lg = g ^^ invGamma;
+        float lb = b ^^ invGamma;
+        return Color4f(lr, lg, lb, a);
+    }
 }
 
 Color4f packNormal(Vector3f n)
@@ -209,7 +221,7 @@ Color4f packNormal(Vector3f n)
     return Color4f((n + 1.0f) * 0.5f);
 }
 
-alias Color4f ColorRGBAf;
+alias ColorRGBAf = Color4f;
 
 /*
  * 32-bit color unpacking
@@ -237,3 +249,23 @@ Color4f color4(int hex)
         cast(float)b / 255.0f,
         cast(float)a / 255.0f);
 }
+
+/*
+ * Blend two colors taking transparency into account
+ */
+Color4f alphaOver(Color4f c1, Color4f c2)
+{
+    Color4f c;
+    float a = c2.a + c1.a * (1.0f - c2.a);
+
+    if (a == 0.0f)
+        c = Color4f(0, 0, 0, 0);
+    else
+    {
+        c = (c2 * c2.a + c1 * c1.a * (1.0f - c2.a)) / a;
+        c.a = a;
+    }
+
+    return c;
+}
+
