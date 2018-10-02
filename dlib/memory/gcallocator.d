@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2011-2017 Timur Gafarov
+Copyright (c) 2017 Timur Gafarov
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -26,63 +26,58 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 */
 
-module dlib.image.tone.contrast;
+module dlib.memory.gcallocator;
 
-private
+import core.exception;
+import core.memory;
+import std.algorithm.comparison;
+import dlib.memory.allocator;
+
+/*
+ * Allocator based on D's built-in garbage collector
+ */
+class GCallocator: Allocator
 {
-    import dlib.image.image;
-    import dlib.image.color;
-}
-
-enum ContrastMethod
-{
-    AverageGray,
-    AverageImage,
-}
-
-SuperImage contrast(SuperImage a, float k, ContrastMethod method = ContrastMethod.AverageGray)
-{
-    return contrast(a, null, k, method);
-}
-
-SuperImage contrast(SuperImage img, SuperImage outp, float k, ContrastMethod method = ContrastMethod.AverageGray)
-{
-    SuperImage res;
-    if (outp)
-        res = outp;
-    else
-        res = img.dup;
-
-    Color4f aver = Color4f(0.0f, 0.0f, 0.0f);
-
-    if (method == ContrastMethod.AverageGray)
+    void[] allocate(size_t size)
     {
-        aver = Color4f(0.5f, 0.5f, 0.5f);
+        return GC.malloc(size)[0..size];
     }
-    else if (method == ContrastMethod.AverageImage)
+
+    bool deallocate(void[] p)
     {
-        foreach(y; 0..res.height)
-        foreach(x; 0..res.width)
+        GC.free(p.ptr);
+        return true;
+    }
+
+    bool reallocate(ref void[] p, size_t size)
+    {
+        GC.realloc(p.ptr, size);
+        return true;
+    }
+
+    @property immutable(uint) alignment() const
+    {
+        return cast(uint) max(double.alignof, real.alignof);
+    }
+
+    static @property GCallocator instance() nothrow
+    {
+        if (instance_ is null)
         {
-            aver += img[x, y];
-            img.updateProgress();
+            immutable size = __traits(classInstanceSize, GCallocator);
+            void* p = GC.malloc(size);
+
+            if (p is null)
+            {
+                onOutOfMemoryError();
+            }
+            p[0..size] = typeid(GCallocator).initializer[];
+            instance_ = cast(GCallocator)p[0..size].ptr;
+
         }
-
-        aver /= (res.height * res.width);
-
-        img.resetProgress();
+        return instance_;
     }
 
-    foreach(y; 0..res.height)
-    foreach(x; 0..res.width)
-    {
-        auto col = img[x, y];
-        col = ((col - aver) * k + aver);
-        res[x, y] = col;
-        img.updateProgress();
-    }
-
-    img.resetProgress();
-
-    return res;
+    private static __gshared GCallocator instance_;
 }
+

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2017 Timur Gafarov, Martin Cejp
+Copyright (c) 2014-2018 Timur Gafarov, Martin Cejp
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,6 +33,8 @@ private
     import std.path;
 
     import dlib.image.image;
+    import dlib.image.animation;
+    import dlib.image.hdri;
     import dlib.image.io.bmp;
     import dlib.image.io.hdr;
     import dlib.image.io.png;
@@ -60,6 +62,7 @@ void saveImage(SuperImage img, string filename)
             break;
         case ".tga", ".TGA":
             img.saveTGA(filename);
+            break;
         default:
             assert(0, "Image I/O error: unsupported image format or illegal extension");
     }
@@ -84,5 +87,45 @@ SuperImage loadImage(string filename)
     }
 }
 
-alias saveImage save;
-alias loadImage load;
+SuperAnimatedImage loadAnimatedImage(string filename)
+{
+    switch(filename.extension)
+    {
+        case ".png", ".apng", ".PNG", ".APNG":
+            return loadAPNG(filename);
+        default:
+            assert(0, "Image I/O error: unsupported image format or illegal extension");
+    }
+}
+
+void saveAnimatedImage(SuperAnimatedImage img, string filename)
+{
+    switch(filename.extension)
+    {
+        case ".png", ".PNG", ".apng", ".APNG":
+            img.saveAPNG(filename);
+            break;
+        default:
+            assert(0, "Image I/O error: unsupported image format or illegal extension");
+    }
+}
+
+void saveHDRImage(SuperHDRImage img, string filename)
+{
+    switch(filename.extension)
+    {
+        case ".hdr", ".HDR":
+            img.saveHDR(filename);
+            break;
+        default:
+            assert(0, "Image I/O error: unsupported image format or illegal extension");
+    }
+}
+
+alias save = saveImage;
+alias load = loadImage;
+
+alias loadAnimated = loadAnimatedImage;
+alias saveAnimated = saveAnimatedImage;
+
+

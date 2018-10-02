@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015-2017 Timur Gafarov
+Copyright (c) 2015-2018 Timur Gafarov
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -35,7 +35,7 @@ import dlib.core.compound;
 import dlib.container.array;
 import dlib.container.dict;
 import dlib.container.stack;
-import dlib.text.slicelexer;
+import dlib.text.lexer;
 import dlib.text.utils;
 
 /*
@@ -239,7 +239,7 @@ class XmlDocument
 XmlDocument parseXMLUnmanaged(string text)
 {
     XmlDocument doc = New!XmlDocument();
-    SliceLexer lex = New!SliceLexer(text, xmlDelims);
+    Lexer lex = New!Lexer(text, xmlDelims);
     Stack!XmlNode nodeStack;
 
     nodeStack.push(doc.root);
@@ -269,9 +269,12 @@ XmlDocument parseXMLUnmanaged(string text)
     {
         token = lex.getLexeme();
 
+        //writeln(token);
+
         if (!token.length)
             break;
 
+        //version(None)
         switch(token)
         {
             case "<![CDATA[":
@@ -425,6 +428,11 @@ XmlDocument parseXMLUnmanaged(string text)
                 {
                     expect = XmlToken.Quote;
                 }
+                else if (expect == XmlToken.TagOpen)
+                {
+                    XmlNode node = New!XmlNode(emptyStr, nodeStack.top);
+                    node.text = immutableCopy(token);
+                }
                 else
                 {
                     error("Unexpected token ", token);
@@ -567,6 +575,8 @@ XmlDocument parseXMLUnmanaged(string text)
 
                             node.appendText(c);
                         }
+                        else
+                            node.text = immutableCopy(token);
                     }
                     else
                         node.text = immutableCopy(token);

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2017 Timur Gafarov
+Copyright (c) 2018 Timur Gafarov, Oleg Baharev
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -26,10 +26,51 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 */
 
-deprecated("dlib.xml package is deprecated, import dlib.serialization.xml instead")
-module dlib.xml;
+module dlib.image.filters.histogram;
 
-public
+import dlib.image.image;
+import dlib.image.color;
+
+int[256] createHistogram(SuperImage img)
 {
-    import dlib.serialization.xml;
+	int[256] histogram;
+
+	foreach (x; 0..img.width)
+	foreach (y; 0..img.height)
+	{
+		int luma = cast(int)(img[x,y].luminance * 255);
+		histogram[luma] += 1; 
+	}
+
+	return histogram;
 }
+
+SuperImage histogramImage(SuperImage img, Color4f background, Color4f diagram)
+{
+    SuperImage res = img.createSameFormat(256, 256);
+    int[256] h = createHistogram(img);
+
+    int vmax = 0;
+    foreach(v; h)
+    {
+        if (v > vmax)
+            vmax = v;
+    }
+
+    foreach(ref v; h)
+    {
+        v = cast(int)(cast(float)v / cast(float)vmax * 255.0f);
+    }
+
+	foreach (x; 0..res.width)
+	foreach (y; 0..res.height)
+	{
+        int v = h[x];
+        if (y < 255 - v)
+            res[x, y] = background;
+        else
+            res[x, y] = diagram;
+    }
+    return res;
+}
+

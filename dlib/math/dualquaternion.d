@@ -35,7 +35,7 @@ import std.format;
 import dlib.math.vector;
 import dlib.math.matrix;
 import dlib.math.quaternion;
-import dlib.math.affine;
+import dlib.math.transformation;
 import dlib.math.dual;
 
 /*
@@ -183,5 +183,5 @@ struct DualQuaternion(T)
 /*
  * Predefined dual quaternion type aliases
  */
-alias DualQuaternion!(float) DualQuaternionf;
-alias DualQuaternion!(double) DualQuaterniond;
+alias DualQuaternionf = DualQuaternion!(float);
+alias DualQuaterniond = DualQuaternion!(double);

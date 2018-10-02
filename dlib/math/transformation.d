@@ -26,7 +26,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 */
 
-module dlib.math.affine;
+module dlib.math.transformation;
 
 import std.math;
 
@@ -34,18 +34,6 @@ import dlib.math.utils;
 import dlib.math.vector;
 import dlib.math.matrix;
 import dlib.math.quaternion;
-
-/*
- * Affine transformations
- *
- * Affine transformation is a function between affine spaces
- * which preserves points, straight lines and planes.
- * Examples of affine transformations include translation, scaling,
- * rotation, reflection, shear and compositions of them in any
- * combination and sequence.
- *
- * dlib uses 4x4 matrices to represent affine transformations.
- */
 
 /*
  * Setup a rotation matrix, given Euler angles in radians

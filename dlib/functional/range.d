@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2011-2017 Timur Gafarov
+Copyright (c) 2011-2018 Timur Gafarov
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -68,6 +68,7 @@ auto range(T)(T start, T end, T step = 1)
     return Range!(T)(start, end, step);
 }
 
+deprecated("dlib.functional.range.map is deprecated, use std.algorithm.map instead")
 auto map(alias func, Range)(Range r)
 {
     struct ResultRange
@@ -96,6 +97,7 @@ auto map(alias func, Range)(Range r)
     return ResultRange(r);
 }
 
+deprecated("dlib.functional.range.filter is deprecated, use std.algorithm.filter instead")
 auto filter(alias pred, Range)(Range r)
 {
     struct ResultRange
@@ -123,8 +125,10 @@ auto filter(alias pred, Range)(Range r)
     return ResultRange(r);
 }
 
+deprecated("dlib.functional.range.where is deprecated, use std.algorithm.filter instead")
 alias where = filter;
 
+deprecated("dlib.functional.range.reduce is deprecated, use std.algorithm.reduce instead")
 auto reduce(alias func, Range)(Range r)
 {
     typeof(r.front) res = 0;

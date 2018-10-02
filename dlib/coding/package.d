@@ -30,7 +30,7 @@ module dlib.coding;
 
 public
 {
-    import dlib.coding.huffman;
     import dlib.coding.zlib;
     import dlib.coding.varint;
+    import dlib.coding.hash;
 }

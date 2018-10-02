@@ -106,10 +106,10 @@ body
 
         res[x, y] = resc; //Color4f(resc.r, resc.g, resc.b, alpha);
 
-        img.updateProgress();
+        //img.updateProgress();
     }
 
-    img.resetProgress();
+    //img.resetProgress();
 
     return res;
 }
@@ -119,8 +119,8 @@ SuperImage morph(MorphOperation op) (SuperImage img)
     return morphOp!(op)(img, null);
 }
 
-alias morph!(MorphOperation.Dilate) dilate;
-alias morph!(MorphOperation.Erode) erode;
+alias dilate = morph!(MorphOperation.Dilate);
+alias erode = morph!(MorphOperation.Erode);
 
 SuperImage open(SuperImage img)
 {

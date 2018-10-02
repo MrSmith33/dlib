@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2013-2017 Timur Gafarov
+Copyright (c) 2013-2018 Timur Gafarov
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -30,14 +30,15 @@ module dlib.image;
 
 public
 {
+    import dlib.image.animation;
     import dlib.image.arithmetics;
+    import dlib.image.canvas;
     import dlib.image.color;
     import dlib.image.compleximage;
     import dlib.image.fthread;
     import dlib.image.hdri;
     import dlib.image.hsv;
     import dlib.image.image;
-    import dlib.image.parallel;
     import dlib.image.signal2d;
     import dlib.image.unmanaged;
     import dlib.image.transform;
@@ -51,6 +52,9 @@ public
     import dlib.image.filters.morphology;
     import dlib.image.filters.normalmap;
     import dlib.image.filters.sharpen;
+    import dlib.image.filters.contrast;
+    import dlib.image.filters.histogram;
+    import dlib.image.filters.binarization;
 
     import dlib.image.io.bmp;
     import dlib.image.io.io;
@@ -66,6 +70,4 @@ public
     import dlib.image.resampling.bilinear;
     import dlib.image.resampling.bicubic;
     import dlib.image.resampling.lanczos;
-
-    import dlib.image.tone.contrast;
 }
